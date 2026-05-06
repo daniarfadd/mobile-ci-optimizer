@@ -1,4 +1,4 @@
-name: Baseline CI (Sequential)
+name: Optimized CI (Parallel + Cache)
 
 on:
   push:
@@ -8,31 +8,36 @@ on:
 
 jobs:
   test:
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        browser: [chromium, webkit]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node with cache
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: 'npm'
 
-      - name: Install dependencies (slower on purpose)
-        run: npm install
+      - name: Install dependencies (fast)
+        run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium webkit --with-deps
+      - name: Install Playwright browsers (targeted)
+        run: npx playwright install ${{ matrix.browser }} --with-deps
 
-      - name: Run Playwright tests (forced sequential)
-        run: npx playwright test --workers=1
+      - name: Run Playwright tests (parallel per browser)
+        run: npx playwright test --project=${{ matrix.browser }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: playwright-report/
-          retention-days: 30
+          retention-days: 7
